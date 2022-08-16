@@ -191,6 +191,7 @@
 
   table thead,
   table tfoot {
+    position: -webkit-sticky; /* Safari */
     position: sticky;
     background: white;
   }
