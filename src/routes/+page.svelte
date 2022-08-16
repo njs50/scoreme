@@ -119,9 +119,11 @@
     <tbody>
      {#each scores as sr, idx}
       <tr>
-        <td class="player{idx % (currentPlayers.length)}">{rowLabel(idx + 2)}</td>
+        <td class="round player{idx % (currentPlayers.length)}">{rowLabel(idx + 2)}</td>
         {#each sr as score, idx }
-          <td class="player{idx}" contenteditable="true" bind:textContent={score}></td>
+          <td class="pcol player{idx}" >
+            <input type="tel" bind:value={score}>
+          </td>
         {/each}   
         <!-- <td>{#if idx == scores.length - 1}<button on:click={addRow}>+</button>{/if}</td>        -->
       </tr>
@@ -129,9 +131,9 @@
     </tbody>
 
     <tfoot>
-      <td>Total:</td>
+      <td class="round">Total:</td>
       {#each totals as total, idx}
-        <td class="player{idx}">{total}</td>
+        <td class="pcol player{idx}">{total}</td>
       {/each}     
       <!-- <td></td>       -->
     </tfoot>
@@ -151,27 +153,35 @@
 	}
 
   table {
-    width: 100%;
+    max-width: 100%;
   }
 
   td {
     border: 1px solid black;
     text-align: center;
     padding: .25em;  
-    width: auto;
+  }
+
+  td.pcol {
+    border: 1px solid black;
+    text-align: center;
+    padding: .25em;  
+    /* width: auto; */
+    min-width: 2.5rem;
   }
 
   td.round {
-    width: 3em;
+    width: 2.5rem;
   }
 
-  thead td input {
+  td input {
     border: none;
     background: none;
     display: inline-block;
     text-align: center;
     padding: 0;
-    width: 3em;
+    width: 100%;
+    max-width: 6em;
   }
 
   table thead,
