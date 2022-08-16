@@ -122,7 +122,12 @@
         <td class="round player{idx % (currentPlayers.length)}">{rowLabel(idx + 2)}</td>
         {#each sr as score, idx }
           <td class="pcol player{idx}" >
-            <input type="tel" bind:value={score}>
+            <input 
+              type="tel" 
+              bind:value={score}
+              use:selectTextOnFocus 
+              use:blurOnEscape
+            >
           </td>
         {/each}   
         <!-- <td>{#if idx == scores.length - 1}<button on:click={addRow}>+</button>{/if}</td>        -->
