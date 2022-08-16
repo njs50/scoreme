@@ -1,12 +1,18 @@
 <script lang="ts">
 
   import { onDestroy } from 'svelte';
-
-  import { playerStore, type Player } from '$lib/PlayerStore' 
+  import {selectTextOnFocus, blurOnEscape} from '$lib/inputDirectives';
   
   type ScoreRow = string[]
 
-  let currentPlayers: Player[] = []
+  type Player = {
+    name: string;
+  }
+
+  let currentPlayers: Player[] = [
+    {name: 'P1'},
+    {name: 'P2'},
+  ]
 
   let scores: ScoreRow[] = []
 
@@ -23,11 +29,9 @@
       }       
     }    
     
-    console.log(tr)
     return tr
     
   }
-
 
 
   $: totals = calcTotals(scores)
@@ -42,6 +46,16 @@
 
 		scores = [...scores, sr]
 	}
+
+  const setupPlayers = () => {
+    scores = []
+    for (let i = 2; i <= 14; i++) {
+      addRow()
+    }    
+  }
+
+  setupPlayers()
+
 
   const rowLabel = (idx: number) => {
 
@@ -68,24 +82,16 @@
     return label
   }
 
-
-	const unsubscribe = playerStore.subscribe(players => {
-    let cp = []
-		for (const player of players) {
-      if (player.active) {
-        cp.push(player)
-      }
+  const addPlayer = () => {
+    console.log('adding a player?/...')
+    currentPlayers = [...currentPlayers, {name: 'P' + (currentPlayers.length + 1).toString()}]
+    for (let [idx, sr] of scores.entries()) {
+      scores[idx] = [...sr, '']     
     }
-    currentPlayers = cp
-    scores = []
+    scores = [...scores]
+  }
 
-    for (let i = 2; i <= 14; i++) {
-      addRow()
-    }
 
-	});
-
-	onDestroy(unsubscribe);
 
 </script>
 
@@ -97,9 +103,15 @@
 <section>
   <table>
     <thead>
-      <td></td>
-      {#each currentPlayers as player, idx (player.order)}
-        <td class="player{idx}" contenteditable="true" bind:textContent={player.name}></td>
+      <td class="round" on:click={addPlayer}>+</td>
+      {#each currentPlayers as player, idx}
+        <td class="pcol player{idx}">
+          <input type="text"
+            bind:value={player.name}
+            use:selectTextOnFocus 
+            use:blurOnEscape
+          >
+      </td>
       {/each}       
       <!-- <td></td> -->
     </thead>
@@ -138,9 +150,41 @@
 		flex: 1;
 	}
 
+  table {
+    width: 100%;
+  }
+
   td {
     border: 1px solid black;
     text-align: center;
-    padding: .25em;  }
+    padding: .25em;  
+    width: auto;
+  }
+
+  td.round {
+    width: 3em;
+  }
+
+  thead td input {
+    border: none;
+    background: none;
+    display: inline-block;
+    text-align: center;
+    padding: 0;
+    width: 3em;
+  }
+
+  table thead,
+  table tfoot {
+    position: sticky;
+    background: white;
+  }
+
+  table thead {
+    inset-block-start: 0; /* "top" */
+  }
+  table tfoot {
+    inset-block-end: 0; /* "bottom" */
+  }
 
 </style>
