@@ -2,7 +2,8 @@
 
   import { onDestroy } from 'svelte';
   import {selectTextOnFocus, blurOnEscape} from '$lib/inputDirectives';
-  
+  import { preventNavigation } from '$lib/preventNavigation';
+
   type ScoreRow = string[]
 
   type Player = {
@@ -100,7 +101,7 @@
 	<meta name="description" content="Score game" />
 </svelte:head>
 
-<section>
+<section use:preventNavigation>
   <table>
     <thead>
       <td class="round" on:click={addPlayer}>+</td>
@@ -150,11 +151,9 @@
 
 <style>
 	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 1;
+    position:absolute;
+    height:100%;
+
 	}
 
   table {
