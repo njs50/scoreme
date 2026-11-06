@@ -39,6 +39,12 @@ test('totals each player and adds players', async ({ page }) => {
 	await expect(totals).toHaveText(['15', '7', '3']);
 });
 
+test('publishes the build SHA', async ({ request }) => {
+	const body = await request.get('version.json').then((res) => res.json());
+	expect(body.sha).toBeTruthy();
+	expect(body.builtAt).toBeTruthy();
+});
+
 test('player names can be edited', async ({ page }) => {
 	await page.goto('');
 	const name = page.locator('thead input').first();

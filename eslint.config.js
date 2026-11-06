@@ -25,6 +25,12 @@ export default defineConfig(
 		}
 	},
 	{
+		files: ['src/app.d.ts'],
+		rules: {
+			'@typescript-eslint/no-unused-vars': 'off'
+		}
+	},
+	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
 			parserOptions: {

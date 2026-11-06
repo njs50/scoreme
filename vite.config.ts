@@ -1,6 +1,49 @@
+import { execSync } from 'node:child_process';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/** Commit the build came from. Preview deploys set PUBLIC_BUILD_ID to github.sha. */
+function buildSha(): string {
+	const fromEnv = process.env.PUBLIC_BUILD_ID || process.env.GITHUB_SHA;
+	if (fromEnv) return fromEnv;
+	try {
+		return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+	} catch {
+		return 'dev';
+	}
+}
+
+/** version.json lets callers confirm which SHA GitHub Pages is actually serving. */
+function versionJson(): Plugin {
+	return {
+		name: 'scoreme-version-json',
+		apply: 'build',
+		generateBundle() {
+			const outDir = this.environment?.config.build.outDir ?? '';
+			// SvelteKit runs this hook for the server build too; only the client build is published.
+			if (!outDir.endsWith('/client') && !outDir.endsWith('\\client')) return;
+			this.emitFile({
+				type: 'asset',
+				fileName: 'version.json',
+				source: `${JSON.stringify({ sha: buildSha(), builtAt: new Date().toISOString() }, null, 2)}\n`
+			});
+		}
+	};
+}
+
+/**
+ * GitHub Pages project path. Production is /scoreme; preview-deploy.yml sets
+ * SCOREME_BASE=/scoreme-preview. Dev serves from the root.
+ */
+function siteBase(command: string, isPreview: boolean): '' | `/${string}` {
+	if (command !== 'build' && !isPreview) return '';
+	const raw = (process.env.SCOREME_BASE ?? '/scoreme').trim().replace(/\/+$/, '');
+	if (!raw.startsWith('/') || raw.includes('//')) {
+		throw new Error(`SCOREME_BASE must be a single root-relative path (got "${raw}")`);
+	}
+	return raw as `/${string}`;
+}
 
 export default defineConfig(({ command, isPreview }) => ({
 	plugins: [
@@ -15,11 +58,15 @@ export default defineConfig(({ command, isPreview }) => ({
 				assets: 'docs'
 			}),
 			paths: {
-				// GitHub Pages serves the site from https://njs50.github.io/scoreme/
-				base: command === 'build' || isPreview ? '/scoreme' : ''
+				base: siteBase(command, isPreview === true)
 			}
-		})
+		}),
+		versionJson()
 	],
+	define: {
+		__PREVIEW_REF__: JSON.stringify(process.env.PUBLIC_PREVIEW_REF ?? ''),
+		__PREVIEW_SHA__: JSON.stringify(process.env.PUBLIC_PREVIEW_SHA ?? '')
+	},
 	server: {
 		host: '0.0.0.0'
 	}

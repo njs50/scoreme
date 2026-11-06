@@ -1,0 +1,121 @@
+# Build any non-main branch and force-publish ./docs to the sibling
+# preview repo njs50/scoreme-preview (branch gh-pages). Last non-main
+# branch push wins — intentional for agent-check previews.
+#
+# Readiness is not polled here: after the gh-pages push succeeds, callers
+# poll https://njs50.github.io/scoreme-preview/version.json for the build SHA.
+#
+# One-time setup (this workflow cannot create it):
+#   1. Public repo njs50/scoreme-preview, Pages source = branch gh-pages, folder /.
+#   2. Fine-grained PAT on njs50/scoreme-preview with Contents read/write
+#      (push) and Deployments read (the idle-slot wait below).
+#   3. Repo secret SCOREME_PREVIEW_PAT on njs50/scoreme holding that token.
+name: Preview deploy
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - gh-pages
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    # Slot wait (~10m soft) + build/push; no post-deploy poll.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.18.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Project Pages URL is https://njs50.github.io/scoreme-preview/
+      # so the SvelteKit base must be /scoreme-preview/ (prod stays /scoreme/).
+      # PUBLIC_PREVIEW_* bake a bottom-left branch/SHA watermark (absent in prod).
+      # PUBLIC_BUILD_ID is written to version.json for live-SHA checks.
+      - name: Build site for scoreme-preview
+        env:
+          PUBLIC_PREVIEW_REF: ${{ github.ref_name }}
+          PUBLIC_PREVIEW_SHA: ${{ github.sha }}
+          PUBLIC_BUILD_ID: ${{ github.sha }}
+          SCOREME_BASE: /scoreme-preview
+        run: pnpm run build
+
+      # Rapid tip pushes collide on GitHub Pages ("in progress deployment … cancel
+      # <previous sha>"). Wait for the github-pages deployment slot to go idle
+      # before force-pushing gh-pages.
+      - name: Wait for scoreme-preview Pages deploy slot
+        env:
+          SCOREME_PREVIEW_PAT: ${{ secrets.SCOREME_PREVIEW_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SCOREME_PREVIEW_PAT}" ]; then
+            echo 'Missing secret SCOREME_PREVIEW_PAT' >&2
+            exit 1
+          fi
+          API="https://api.github.com/repos/njs50/scoreme-preview"
+          AUTH="Authorization: Bearer ${SCOREME_PREVIEW_PAT}"
+          for attempt in $(seq 1 60); do
+            ids=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" \
+              "${API}/deployments?environment=github-pages&per_page=5" \
+              | jq -r '.[].id')
+            busy=0
+            for id in $ids; do
+              state=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" \
+                "${API}/deployments/${id}/statuses" \
+                | jq -r '.[0].state // "none"')
+              case "$state" in
+                in_progress|queued|pending|waiting) busy=1 ;;
+              esac
+            done
+            if [ "$busy" = "0" ]; then
+              echo "Pages deploy slot idle (attempt ${attempt})"
+              # Brief settle — Pages sometimes still rejects for a few seconds.
+              sleep 15
+              exit 0
+            fi
+            echo "Pages deploy slot busy (attempt ${attempt}/60); sleeping 10s"
+            sleep 10
+          done
+          echo 'Timed out waiting for idle Pages deploy slot; pushing anyway' >&2
+
+      - name: Deploy docs to njs50/scoreme-preview gh-pages
+        env:
+          SCOREME_PREVIEW_PAT: ${{ secrets.SCOREME_PREVIEW_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SCOREME_PREVIEW_PAT}" ]; then
+            echo 'Missing secret SCOREME_PREVIEW_PAT (fine-grained PAT with Contents R/W on njs50/scoreme-preview).' >&2
+            exit 1
+          fi
+          touch docs/.nojekyll
+          cd docs
+          git init
+          git checkout -B gh-pages
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Preview ${GITHUB_SHA} from ${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}"
+          git push --force "https://x-access-token:${SCOREME_PREVIEW_PAT}@github.com/njs50/scoreme-preview.git" HEAD:gh-pages
+          echo "Pushed preview build ${GITHUB_SHA}"
+          echo "Poll https://njs50.github.io/scoreme-preview/version.json for sha=${GITHUB_SHA}"
