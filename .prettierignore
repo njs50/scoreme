@@ -8,8 +8,5 @@ bun.lockb
 # Build output (published to GitHub Pages)
 /docs/
 
-# Old components, not part of the app
-/temp/
-
 # Miscellaneous
 /static/
