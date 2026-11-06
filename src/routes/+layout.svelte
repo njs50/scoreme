@@ -1,11 +1,21 @@
 <script lang="ts">
 	import '../app.css';
+	import type { LayoutProps } from './$types';
+
+	let { children }: LayoutProps = $props();
+
+	// Branch + short SHA. Only preview-deploy.yml sets these; production stays blank.
+	const previewWatermark =
+		__PREVIEW_REF__ && __PREVIEW_SHA__ ? `${__PREVIEW_REF__} · ${__PREVIEW_SHA__.slice(0, 7)}` : '';
 </script>
 
 <main>
-	<slot />
+	{@render children()}
 </main>
 
+{#if previewWatermark}
+	<div class="preview-watermark" aria-hidden="true">{previewWatermark}</div>
+{/if}
 
 <style>
 	main {
@@ -19,4 +29,18 @@
 		box-sizing: border-box;
 	}
 
+	.preview-watermark {
+		position: fixed;
+		left: 8px;
+		bottom: 6px;
+		z-index: 9999;
+		pointer-events: none;
+		font:
+			10px/1.2 ui-monospace,
+			SFMono-Regular,
+			Menlo,
+			Consolas,
+			monospace;
+		color: rgba(0, 0, 0, 0.45);
+	}
 </style>
