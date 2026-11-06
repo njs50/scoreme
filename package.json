@@ -16,7 +16,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p src/service-worker",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
@@ -24,7 +24,8 @@
 		"test": "pnpm run test:unit && pnpm run test:e2e",
 		"test:unit": "vitest run",
 		"test:unit:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
+		"test:coverage": "vitest run --coverage",
+		"icons": "node scripts/generate-icons.js"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

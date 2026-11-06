@@ -7,9 +7,12 @@
 	"include": [
 		"src",
 		"tests",
+		"vite",
+		"scripts",
 		"vite.config.ts",
 		"prettier.config.js",
 		"eslint.config.js",
 		"playwright.config.ts"
-	]
+	],
+	"exclude": ["src/service-worker"]
 }
