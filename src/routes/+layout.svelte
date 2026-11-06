@@ -1,11 +1,13 @@
 <script lang="ts">
 	import '../app.css';
+	import type { LayoutProps } from './$types';
+
+	let { children }: LayoutProps = $props();
 </script>
 
 <main>
-	<slot />
+	{@render children()}
 </main>
-
 
 <style>
 	main {
@@ -18,5 +20,4 @@
 		margin: 0 auto;
 		box-sizing: border-box;
 	}
-
 </style>

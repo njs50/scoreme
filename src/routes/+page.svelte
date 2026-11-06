@@ -1,99 +1,52 @@
 <script lang="ts">
+	import { selectTextOnFocus, blurOnEscape } from '#lib/inputDirectives.ts';
 
-  import { onDestroy } from 'svelte';
-  import {selectTextOnFocus, blurOnEscape} from '$lib/inputDirectives';
-  import { preventNavigation } from '$lib/preventNavigation';
+	type ScoreRow = string[];
 
-  type ScoreRow = string[]
+	type Player = {
+		name: string;
+	};
 
-  type Player = {
-    name: string;
-  }
+	let currentPlayers: Player[] = $state([{ name: 'P1' }, { name: 'P2' }]);
 
-  let currentPlayers: Player[] = [
-    {name: 'P1'},
-    {name: 'P2'},
-  ]
+	const emptyRow = (): ScoreRow => currentPlayers.map(() => '');
 
-  let scores: ScoreRow[] = []
+	// One row per round, from 2's wild up to Aces.
+	let scores: ScoreRow[] = $state(Array.from({ length: 13 }, emptyRow));
 
-  const calcTotals = (scores: ScoreRow[]) => {
-    let tr: number[] = []
+	let totals = $derived(
+		currentPlayers.map((_, playerIdx) =>
+			scores.reduce((total, sr) => total + (parseInt(sr[playerIdx]) | 0), 0)
+		)
+	);
 
-    for (const player of currentPlayers ) {
-      tr.push(0)
-    } 
-    
-    for (const sr of scores ) {
-      for (const idx in tr) {
-        tr[idx] += parseInt(sr[idx]) | 0 
-      }       
-    }    
-    
-    return tr
-    
-  }
+	const rowLabel = (idx: number) => {
+		switch (idx) {
+			case 11:
+				return 'J';
+			case 12:
+				return 'Q';
+			case 13:
+				return 'K';
+			case 14:
+				return 'A';
+			default:
+				return idx.toString();
+		}
+	};
 
+	const confirmLeave = (e: BeforeUnloadEvent) => {
+		e.preventDefault();
+		// Older browsers only show the prompt when returnValue is set.
+		e.returnValue = true;
+	};
 
-  $: totals = calcTotals(scores)
-
-
-  const addRow = ()=>{
-    let sr: ScoreRow = []
-
-    for (const player of currentPlayers ) {
-      sr.push('')
-    }
-
-		scores = [...scores, sr]
-	}
-
-  const setupPlayers = () => {
-    scores = []
-    for (let i = 2; i <= 14; i++) {
-      addRow()
-    }    
-  }
-
-  setupPlayers()
-
-
-  const rowLabel = (idx: number) => {
-
-    let label = ''
-    // currentPlayers[(idx - 2) % (currentPlayers.length)].name.substring(0,3) + ' - '
-
-    switch(idx) {
-      case 11: 
-        label += 'J';
-        break;
-      case 12: 
-        label += 'Q';
-        break;
-      case 13: 
-        label += 'K';
-        break;
-      case 14: 
-        label += 'A';
-        break;                
-      default: label += idx.toString()
-
-    }
-
-    return label
-  }
-
-  const addPlayer = () => {
-    console.log('adding a player?/...')
-    currentPlayers = [...currentPlayers, {name: 'P' + (currentPlayers.length + 1).toString()}]
-    for (let [idx, sr] of scores.entries()) {
-      scores[idx] = [...sr, '']     
-    }
-    scores = [...scores]
-  }
-
-
-
+	const addPlayer = () => {
+		currentPlayers.push({ name: 'P' + (currentPlayers.length + 1).toString() });
+		for (const sr of scores) {
+			sr.push('');
+		}
+	};
 </script>
 
 <svelte:head>
@@ -101,105 +54,93 @@
 	<meta name="description" content="Score game" />
 </svelte:head>
 
-<section use:preventNavigation>
-  <table>
-    <thead>
-      <td class="round" on:click={addPlayer}>+</td>
-      {#each currentPlayers as player, idx}
-        <td class="pcol player{idx}">
-          <input type="text"
-            bind:value={player.name}
-            use:selectTextOnFocus 
-            use:blurOnEscape
-          >
-      </td>
-      {/each}       
-      <!-- <td></td> -->
-    </thead>
+<svelte:window onbeforeunload={confirmLeave} />
 
-    <tbody>
-     {#each scores as sr, idx}
-      <tr>
-        <td class="round player{idx % (currentPlayers.length)}">{rowLabel(idx + 2)}</td>
-        {#each sr as score, idx }
-          <td class="pcol player{idx}" >
-            <input 
-              type="tel" 
-              bind:value={score}
-              use:selectTextOnFocus 
-              use:blurOnEscape
-            >
-          </td>
-        {/each}   
-        <!-- <td>{#if idx == scores.length - 1}<button on:click={addRow}>+</button>{/if}</td>        -->
-      </tr>
-     {/each}
-    </tbody>
+<section>
+	<table>
+		<thead>
+			<tr>
+				<td class="round" onclick={addPlayer}>+</td>
+				{#each currentPlayers as player, idx (idx)}
+					<td class="pcol player{idx}">
+						<input type="text" bind:value={player.name} use:selectTextOnFocus use:blurOnEscape />
+					</td>
+				{/each}
+			</tr>
+		</thead>
 
-    <tfoot>
-      <td class="round">Total:</td>
-      {#each totals as total, idx}
-        <td class="pcol player{idx}">{total}</td>
-      {/each}     
-      <!-- <td></td>       -->
-    </tfoot>
+		<tbody>
+			{#each scores as sr, rowIdx (rowIdx)}
+				<tr>
+					<td class="round player{rowIdx % currentPlayers.length}">{rowLabel(rowIdx + 2)}</td>
+					{#each sr, idx (idx)}
+						<td class="pcol player{idx}">
+							<input type="tel" bind:value={sr[idx]} use:selectTextOnFocus use:blurOnEscape />
+						</td>
+					{/each}
+				</tr>
+			{/each}
+		</tbody>
 
-  </table>
+		<tfoot>
+			<tr>
+				<td class="round">Total:</td>
+				{#each totals as total, idx (idx)}
+					<td class="pcol player{idx}">{total}</td>
+				{/each}
+			</tr>
+		</tfoot>
+	</table>
 </section>
-
-
 
 <style>
 	section {
-    position:absolute;
-    height:100%;
-
+		position: absolute;
+		height: 100%;
 	}
 
-  table {
-    max-width: 100%;
-  }
+	table {
+		max-width: 100%;
+	}
 
-  td {
-    border: 1px solid black;
-    text-align: center;
-    padding: .25em;  
-  }
+	td {
+		border: 1px solid black;
+		text-align: center;
+		padding: 0.25em;
+	}
 
-  td.pcol {
-    border: 1px solid black;
-    text-align: center;
-    padding: .25em;  
-    /* width: auto; */
-    min-width: 2.5rem;
-  }
+	td.pcol {
+		border: 1px solid black;
+		text-align: center;
+		padding: 0.25em;
+		min-width: 2.5rem;
+	}
 
-  td.round {
-    width: 2.5rem;
-  }
+	td.round {
+		width: 2.5rem;
+	}
 
-  td input {
-    border: none;
-    background: none;
-    display: inline-block;
-    text-align: center;
-    padding: 0;
-    width: 100%;
-    max-width: 6em;
-  }
+	td input {
+		border: none;
+		background: none;
+		display: inline-block;
+		text-align: center;
+		padding: 0;
+		width: 100%;
+		max-width: 6em;
+	}
 
-  table thead,
-  table tfoot {
-    position: -webkit-sticky; /* Safari */
-    position: sticky;
-    background: white;
-  }
+	table thead,
+	table tfoot {
+		position: -webkit-sticky; /* Safari */
+		position: sticky;
+		background: white;
+	}
 
-  table thead {
-    inset-block-start: 0; /* "top" */
-  }
-  table tfoot {
-    inset-block-end: 0; /* "bottom" */
-  }
-
+	table thead {
+		inset-block-start: 0; /* "top" */
+	}
+	table tfoot {
+		inset-block-end: 0; /* "bottom" */
+	}
 </style>

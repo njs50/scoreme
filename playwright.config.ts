@@ -1,10 +1,10 @@
-import type { PlaywrightTestConfig } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 
-const config: PlaywrightTestConfig = {
-	webServer: {
-		command: 'npm run build && npm run preview',
-		port: 4173
-	}
-};
-
-export default config;
+export default defineConfig({
+	webServer: { command: 'pnpm run build && pnpm run preview', port: 4173 },
+	use: {
+		// Production builds are served under the GitHub Pages base path.
+		baseURL: 'http://localhost:4173/scoreme/'
+	},
+	testMatch: '**/*.e2e.{ts,js}'
+});

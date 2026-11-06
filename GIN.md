@@ -8,18 +8,17 @@ deal 7 cards each, flip a card onto the discard pile
 
 next to dealer starts
 
-
 ## playing
 
 on your turn you can either:
 
-1) pickup the entire discard pile
-2) pickup a mystery card
+1. pickup the entire discard pile
+2. pickup a mystery card
 
 next if you haven't started putting cards down you can put down either:
 
-1) 3 of the same card
-2) 3 cards of the same suit in a run. i.e 5,6,7 or Q, K, A.
+1. 3 of the same card
+2. 3 cards of the same suit in a run. i.e 5,6,7 or Q, K, A.
 
 to finish your turn you discard a card.
 
