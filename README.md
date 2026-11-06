@@ -19,11 +19,16 @@ pnpm dev --open
 Other useful scripts:
 
 ```bash
-pnpm check   # svelte-check / TypeScript
-pnpm lint    # prettier + eslint
-pnpm format  # prettier --write
-pnpm test    # Playwright end-to-end tests (run `pnpm exec playwright install chromium` once first)
+pnpm check          # svelte-check / TypeScript
+pnpm lint           # prettier + eslint
+pnpm format         # prettier --write
+pnpm test:unit      # Vitest: unit tests (Node) and component tests (Chromium)
+pnpm test:coverage  # the same, with coverage thresholds enforced
+pnpm test:e2e       # Playwright against the production build
+pnpm test           # unit/component, then end-to-end
 ```
+
+Tests need Chromium once: `pnpm exec playwright install chromium`. CI (`.github/workflows/ci.yml`) runs all of the above on every pull request and push to `main`.
 
 ## Building and deploying
 

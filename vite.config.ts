@@ -1,7 +1,9 @@
 import { execSync } from 'node:child_process';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, type Plugin } from 'vite';
+import { playwright } from '@vitest/browser-playwright';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 /** Commit the build came from. Preview deploys set PUBLIC_BUILD_ID to github.sha. */
 function buildSha(): string {
@@ -69,5 +71,46 @@ export default defineConfig(({ command, isPreview }) => ({
 	},
 	server: {
 		host: '0.0.0.0'
+	},
+	test: {
+		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			include: ['src/**/*.{ts,svelte}'],
+			exclude: ['src/**/*.{test,spec}.ts', 'src/**/*.d.ts'],
+			thresholds: {
+				'src/**/*.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+				// Branches are left out for components: the Svelte compiler wraps template
+				// expressions in `?? ''` fallbacks that can never be reached.
+				'src/**/*.svelte': { statements: 100, functions: 100, lines: 100 }
+			}
+		},
+		projects: [
+			{
+				extends: './vite.config.ts',
+				define: {
+					__PREVIEW_REF__: JSON.stringify('test-branch'),
+					__PREVIEW_SHA__: JSON.stringify('abcdef1234567890')
+				},
+				test: {
+					name: 'client',
+					browser: {
+						enabled: true,
+						provider: playwright(),
+						instances: [{ browser: 'chromium', headless: true }]
+					},
+					include: ['src/**/*.svelte.{test,spec}.ts']
+				}
+			},
+			{
+				extends: './vite.config.ts',
+				test: {
+					name: 'server',
+					environment: 'node',
+					include: ['src/**/*.{test,spec}.ts'],
+					exclude: ['src/**/*.svelte.{test,spec}.ts']
+				}
+			}
+		]
 	}
 }));
