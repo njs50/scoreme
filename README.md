@@ -27,13 +27,15 @@ pnpm test    # Playwright end-to-end tests (run `pnpm exec playwright install ch
 
 ## Building and deploying
 
-The site is published with GitHub Pages from the `docs/` folder at https://njs50.github.io/scoreme/.
+Pushes to `main` are deployed by `.github/workflows/deploy-pages.yml`. The workflow builds the site and force-pushes it to the `gh-pages` branch, which GitHub Pages serves at https://njs50.github.io/scoreme/. Nothing built is committed to `main`.
+
+To build locally:
 
 ```bash
 pnpm build
 ```
 
-writes the static site to `docs/` with the `/scoreme` base path, plus a `version.json` containing the commit SHA. Commit the updated `docs/` folder to publish it. `pnpm preview` serves the build locally at http://localhost:4173/scoreme/.
+writes the static site to `docs/` (git-ignored) with the `/scoreme` base path, plus a `version.json` containing the commit SHA. `pnpm preview` serves that build locally at http://localhost:4173/scoreme/.
 
 ## Preview deploys
 
