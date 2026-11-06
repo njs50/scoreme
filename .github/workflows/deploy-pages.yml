@@ -1,9 +1,6 @@
 # Publish main to the production site https://njs50.github.io/scoreme/.
 # Pages serves branch gh-pages (folder /). Each run rebuilds the site and
 # force-pushes the output there, so gh-pages only holds the latest build.
-#
-# Switch Settings → Pages → Source to "Deploy from a branch: gh-pages / (root)"
-# only after the first successful run here has created that branch.
 name: Deploy to GitHub Pages
 
 on:
@@ -41,8 +38,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Production base is /scoreme (vite.config.ts). The committed docs/ folder is
-      # cleared first so hashed assets from older builds are not republished.
+      # Production base is /scoreme (vite.config.ts). docs/ is build output, so it is
+      # cleared first in case a previous run left files in the checkout.
       - name: Build site
         env:
           PUBLIC_BUILD_ID: ${{ github.sha }}
