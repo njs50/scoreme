@@ -57,11 +57,13 @@ test('works offline once loaded', async ({ page, context }) => {
 
 test('never serves version.json from the cache', async ({ page, context }) => {
 	await waitForServiceWorker(page);
-	expect(await page.evaluate(async () => (await fetch('version.json')).ok)).toBe(true);
+	expect(
+		await page.evaluate(async () => (await fetch('version.json', { cache: 'no-store' })).ok)
+	).toBe(true);
 
 	await context.setOffline(true);
 	const offline = await page.evaluate(() =>
-		fetch('version.json').then(
+		fetch('version.json', { cache: 'no-store' }).then(
 			() => 'served',
 			() => 'failed'
 		)
