@@ -6,5 +6,7 @@ export default defineConfig({
 		// Production builds are served under the GitHub Pages base path.
 		baseURL: 'http://localhost:4173/scoreme/'
 	},
-	testMatch: '**/*.e2e.{ts,js}'
+	testMatch: '**/*.e2e.{ts,js}',
+	forbidOnly: !!process.env.CI,
+	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list'
 });

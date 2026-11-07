@@ -1,53 +1,137 @@
 import { expect, test } from '@playwright/test';
 
-test('has a row for each round from 2 to A', async ({ page }) => {
+const score = (page: import('@playwright/test').Page, player: string, round: string) =>
+	page.getByLabel(`${player} score, round ${round}`, { exact: true });
+const total = (page: import('@playwright/test').Page, player: string) =>
+	page.getByLabel(`${player} total`, { exact: true });
+
+test('serves the scorecard from the production base path', async ({ page }) => {
 	await page.goto('');
-	const labels = page.locator('tbody td.round');
-	await expect(labels).toHaveText([
-		'2',
-		'3',
-		'4',
-		'5',
-		'6',
-		'7',
-		'8',
-		'9',
-		'10',
-		'J',
-		'Q',
-		'K',
-		'A'
-	]);
+	await expect(page).toHaveURL(/\/scoreme\/$/);
+	await expect(page).toHaveTitle('Score');
+	await expect(page.locator('tbody tr')).toHaveCount(13);
+	await expect(page.locator('.preview-watermark')).toHaveCount(0);
 });
 
-test('totals each player and adds players', async ({ page }) => {
+test('keeps a running total while playing a game', async ({ page }) => {
 	await page.goto('');
-	const totals = page.locator('tfoot td.pcol');
-	await expect(totals).toHaveText(['0', '0']);
 
-	const rows = page.locator('tbody tr');
-	await rows.nth(0).locator('input').nth(0).fill('5');
-	await rows.nth(1).locator('input').nth(0).fill('10');
-	await rows.nth(0).locator('input').nth(1).fill('7');
-	await expect(totals).toHaveText(['15', '7']);
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await page.getByLabel('Player 1 name').fill('Greer');
 
-	await page.locator('thead td.round').click();
-	const names = page.locator('thead input');
-	await expect(names).toHaveCount(3);
-	await expect(names.nth(2)).toHaveValue('P3');
-	await rows.nth(2).locator('input').nth(2).fill('3');
-	await expect(totals).toHaveText(['15', '7', '3']);
+	await score(page, 'Greer', '2').fill('5');
+	await score(page, 'Greer', '3').fill('10');
+	await score(page, 'P2', '2').fill('7');
+	await score(page, 'P3', 'A').fill('3');
+
+	await expect(total(page, 'Greer')).toHaveText('15');
+	await expect(total(page, 'P2')).toHaveText('7');
+	await expect(total(page, 'P3')).toHaveText('3');
+});
+
+test('typing into a filled cell replaces its score', async ({ page }) => {
+	await page.goto('');
+	const cell = score(page, 'P1', '2');
+	await cell.fill('12');
+	await page.keyboard.press('Tab');
+
+	await cell.click();
+	await page.keyboard.type('4');
+
+	await expect(cell).toHaveValue('4');
+	await expect(total(page, 'P1')).toHaveText('4');
+});
+
+test('Escape leaves the cell', async ({ page }) => {
+	await page.goto('');
+	const cell = score(page, 'P1', '2');
+	await cell.click();
+	await expect(cell).toBeFocused();
+
+	await page.keyboard.press('Escape');
+
+	await expect(cell).not.toBeFocused();
+});
+
+test('keeps the game across a reload without asking', async ({ page }) => {
+	await page.goto('');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await page.getByLabel('Player 1 name').fill('Greer');
+	await score(page, 'Greer', '2').fill('5');
+	await expect
+		.poll(() => page.evaluate(() => localStorage.getItem('scoreme:/scoreme')))
+		.toContain('Greer');
+
+	const dialogs: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogs.push(dialog.type());
+		void dialog.accept();
+	});
+	await page.reload();
+
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('Greer');
+	await expect(page.getByLabel('Player 3 name')).toHaveValue('P3');
+	await expect(score(page, 'Greer', '2')).toHaveValue('5');
+	await expect(total(page, 'Greer')).toHaveText('5');
+	expect(dialogs).toEqual([]);
+});
+
+test('asks before a reload when the game cannot be saved', async ({ page }) => {
+	await page.addInitScript(() => {
+		const storage = Object.getPrototypeOf(localStorage) as Storage;
+		const setItem = storage.setItem;
+		storage.setItem = function (this: Storage, key: string, value: string) {
+			if (this === localStorage) throw new DOMException('quota', 'QuotaExceededError');
+			return setItem.call(this, key, value);
+		};
+	});
+	await page.goto('');
+	await score(page, 'P1', '2').fill('5');
+
+	const dialog = page.waitForEvent('dialog');
+	const reload = page.reload();
+	const prompt = await dialog;
+	expect(prompt.type()).toBe('beforeunload');
+	await prompt.accept();
+	await reload;
+
+	await expect(score(page, 'P1', '2')).toHaveValue('');
+});
+
+test('clears the saved game after confirmation', async ({ page }) => {
+	await page.goto('');
+	await page.getByLabel('Player 1 name').fill('Greer');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await score(page, 'Greer', '2').fill('5');
+
+	page.once('dialog', (dialog) => {
+		expect(dialog.type()).toBe('confirm');
+		void dialog.dismiss();
+	});
+	await page.getByRole('button', { name: 'New game' }).click();
+	await expect(score(page, 'Greer', '2')).toHaveValue('5');
+
+	page.once('dialog', (dialog) => {
+		void dialog.accept();
+	});
+	await page.getByRole('button', { name: 'New game' }).click();
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('P1');
+	await expect(page.getByLabel('Player 3 name')).toHaveCount(0);
+	await expect(score(page, 'P1', '2')).toHaveValue('');
+
+	const dialogs: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogs.push(dialog.type());
+		void dialog.accept();
+	});
+	await page.reload();
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('P1');
+	await expect(score(page, 'P1', '2')).toHaveValue('');
+	expect(dialogs).toEqual([]);
 });
 
 test('publishes the build SHA', async ({ request }) => {
 	const body = await request.get('version.json').then((res) => res.json());
 	expect(body.sha).toBeTruthy();
 	expect(body.builtAt).toBeTruthy();
-});
-
-test('player names can be edited', async ({ page }) => {
-	await page.goto('');
-	const name = page.locator('thead input').first();
-	await name.fill('Greer');
-	await expect(name).toHaveValue('Greer');
 });

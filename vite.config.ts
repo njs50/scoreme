@@ -1,7 +1,10 @@
 import { execSync } from 'node:child_process';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, type Plugin } from 'vite';
+import { playwright } from '@vitest/browser-playwright';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
+import { webManifest } from './vite/webManifest.ts';
 
 /** Commit the build came from. Preview deploys set PUBLIC_BUILD_ID to github.sha. */
 function buildSha(): string {
@@ -14,20 +17,32 @@ function buildSha(): string {
 	}
 }
 
-/** version.json lets callers confirm which SHA GitHub Pages is actually serving. */
-function versionJson(): Plugin {
+const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
+
+/**
+ * Files written next to index.html: version.json lets callers confirm which SHA
+ * GitHub Pages is actually serving, and manifest.webmanifest makes the app
+ * installable (preview builds get their own name).
+ */
+function siteFiles(): Plugin {
+	const manifest = () => json(webManifest({ preview: !!process.env.PUBLIC_PREVIEW_REF }));
 	return {
-		name: 'scoreme-version-json',
-		apply: 'build',
+		name: 'scoreme-site-files',
+		configureServer(server) {
+			server.middlewares.use('/manifest.webmanifest', (_req, res) => {
+				res.setHeader('Content-Type', 'application/manifest+json');
+				res.end(manifest());
+			});
+		},
 		generateBundle() {
-			const outDir = this.environment?.config.build.outDir ?? '';
-			// SvelteKit runs this hook for the server build too; only the client build is published.
-			if (!outDir.endsWith('/client') && !outDir.endsWith('\\client')) return;
+			// SvelteKit also runs ssr and serviceWorker builds; these belong to the browser app.
+			if (this.environment?.name !== 'client') return;
 			this.emitFile({
 				type: 'asset',
 				fileName: 'version.json',
-				source: `${JSON.stringify({ sha: buildSha(), builtAt: new Date().toISOString() }, null, 2)}\n`
+				source: json({ sha: buildSha(), builtAt: new Date().toISOString() })
 			});
+			this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest() });
 		}
 	};
 }
@@ -61,7 +76,7 @@ export default defineConfig(({ command, isPreview }) => ({
 				base: siteBase(command, isPreview === true)
 			}
 		}),
-		versionJson()
+		siteFiles()
 	],
 	define: {
 		__PREVIEW_REF__: JSON.stringify(process.env.PUBLIC_PREVIEW_REF ?? ''),
@@ -69,5 +84,52 @@ export default defineConfig(({ command, isPreview }) => ({
 	},
 	server: {
 		host: '0.0.0.0'
+	},
+	test: {
+		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			include: ['src/**/*.{ts,svelte}', 'vite/**/*.ts'],
+			exclude: [
+				'**/*.{test,spec}.ts',
+				'src/**/*.d.ts',
+				// Runs as a service worker; its rules live in serviceWorkerPolicy.ts and the
+				// worker itself is exercised by tests/pwa.e2e.ts against the real build.
+				'src/service-worker/**'
+			],
+			thresholds: {
+				'{src,vite}/**/*.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+				// Branches are left out for components: the Svelte compiler wraps template
+				// expressions in `?? ''` fallbacks that can never be reached.
+				'src/**/*.svelte': { statements: 100, functions: 100, lines: 100 }
+			}
+		},
+		projects: [
+			{
+				extends: './vite.config.ts',
+				define: {
+					__PREVIEW_REF__: JSON.stringify('test-branch'),
+					__PREVIEW_SHA__: JSON.stringify('abcdef1234567890')
+				},
+				test: {
+					name: 'client',
+					browser: {
+						enabled: true,
+						provider: playwright(),
+						instances: [{ browser: 'chromium', headless: true }]
+					},
+					include: ['src/**/*.svelte.{test,spec}.ts']
+				}
+			},
+			{
+				extends: './vite.config.ts',
+				test: {
+					name: 'server',
+					environment: 'node',
+					include: ['{src,vite}/**/*.{test,spec}.ts'],
+					exclude: ['src/**/*.svelte.{test,spec}.ts']
+				}
+			}
+		]
 	}
 }));
