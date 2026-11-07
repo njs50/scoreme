@@ -43,6 +43,21 @@ test('registers a service worker scoped to the base path', async ({ page }) => {
 	expect(caches).toEqual([expect.stringMatching(/^scoreme:\/scoreme:/)]);
 });
 
+test('keeps a saved game when reloaded offline', async ({ page, context }) => {
+	await waitForServiceWorker(page);
+	await page.getByLabel('Player 1 name').fill('Greer');
+	await page.getByLabel('Greer score, round 2', { exact: true }).fill('8');
+	await expect
+		.poll(() => page.evaluate(() => localStorage.getItem('scoreme:/scoreme')))
+		.toContain('Greer');
+
+	await context.setOffline(true);
+	await page.reload();
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('Greer');
+	await expect(page.getByLabel('Greer score, round 2', { exact: true })).toHaveValue('8');
+	await expect(page.getByLabel('Greer total', { exact: true })).toHaveText('8');
+});
+
 test('works offline once loaded', async ({ page, context }) => {
 	await waitForServiceWorker(page);
 

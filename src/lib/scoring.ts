@@ -30,7 +30,7 @@ export function colourClass(player: number): string {
 	return `player${player % PLAYER_COLOURS}`;
 }
 
-/** True once any score has been entered, i.e. reloading would lose something. */
+/** True once any score cell has been filled in. */
 export function hasScores(scores: readonly (readonly string[])[]): boolean {
 	return scores.some((row) => row.some((score) => score.trim() !== ''));
 }

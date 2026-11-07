@@ -53,7 +53,38 @@ test('Escape leaves the cell', async ({ page }) => {
 	await expect(cell).not.toBeFocused();
 });
 
-test('asks before a reload throws away the scores', async ({ page }) => {
+test('keeps the game across a reload without asking', async ({ page }) => {
+	await page.goto('');
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await page.getByLabel('Player 1 name').fill('Greer');
+	await score(page, 'Greer', '2').fill('5');
+	await expect
+		.poll(() => page.evaluate(() => localStorage.getItem('scoreme:/scoreme')))
+		.toContain('Greer');
+
+	const dialogs: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogs.push(dialog.type());
+		void dialog.accept();
+	});
+	await page.reload();
+
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('Greer');
+	await expect(page.getByLabel('Player 3 name')).toHaveValue('P3');
+	await expect(score(page, 'Greer', '2')).toHaveValue('5');
+	await expect(total(page, 'Greer')).toHaveText('5');
+	expect(dialogs).toEqual([]);
+});
+
+test('asks before a reload when the game cannot be saved', async ({ page }) => {
+	await page.addInitScript(() => {
+		const storage = Object.getPrototypeOf(localStorage) as Storage;
+		const setItem = storage.setItem;
+		storage.setItem = function (this: Storage, key: string, value: string) {
+			if (this === localStorage) throw new DOMException('quota', 'QuotaExceededError');
+			return setItem.call(this, key, value);
+		};
+	});
 	await page.goto('');
 	await score(page, 'P1', '2').fill('5');
 
@@ -63,20 +94,39 @@ test('asks before a reload throws away the scores', async ({ page }) => {
 	expect(prompt.type()).toBe('beforeunload');
 	await prompt.accept();
 	await reload;
+
+	await expect(score(page, 'P1', '2')).toHaveValue('');
 });
 
-test('reloads an empty sheet without asking', async ({ page }) => {
+test('clears the saved game after confirmation', async ({ page }) => {
 	await page.goto('');
 	await page.getByLabel('Player 1 name').fill('Greer');
-	const dialogs: string[] = [];
-	page.on('dialog', (d) => {
-		dialogs.push(d.type());
-		void d.accept();
+	await page.getByRole('button', { name: 'Add player' }).click();
+	await score(page, 'Greer', '2').fill('5');
+
+	page.once('dialog', (dialog) => {
+		expect(dialog.type()).toBe('confirm');
+		void dialog.dismiss();
 	});
+	await page.getByRole('button', { name: 'New game' }).click();
+	await expect(score(page, 'Greer', '2')).toHaveValue('5');
 
-	await page.reload();
-
+	page.once('dialog', (dialog) => {
+		void dialog.accept();
+	});
+	await page.getByRole('button', { name: 'New game' }).click();
 	await expect(page.getByLabel('Player 1 name')).toHaveValue('P1');
+	await expect(page.getByLabel('Player 3 name')).toHaveCount(0);
+	await expect(score(page, 'P1', '2')).toHaveValue('');
+
+	const dialogs: string[] = [];
+	page.on('dialog', (dialog) => {
+		dialogs.push(dialog.type());
+		void dialog.accept();
+	});
+	await page.reload();
+	await expect(page.getByLabel('Player 1 name')).toHaveValue('P1');
+	await expect(score(page, 'P1', '2')).toHaveValue('');
 	expect(dialogs).toEqual([]);
 });
 
