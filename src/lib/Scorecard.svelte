@@ -152,6 +152,8 @@
 		min-height: 0;
 		min-width: 0;
 		overflow: auto;
+		display: flex;
+		flex-direction: column;
 	}
 
 	section:not(.ready) {
@@ -160,41 +162,65 @@
 
 	table {
 		--round: 2.4em;
+		/* Percentage heights on table rows dump the leftover pixels onto the last
+		   scoring row, so the sheet is a flex column of equal rows instead. */
+		display: flex;
+		flex-direction: column;
 		width: 100%;
 		/* A column stays wide enough for three digits, then the sheet scrolls sideways. */
 		min-width: calc(var(--round) + var(--players) * 4.5ch);
-		height: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
+		flex: 1 1 auto;
+		min-height: min-content;
+		border-top: 1px solid black;
+		border-left: 1px solid black;
+		box-sizing: border-box;
 		font-size: clamp(1rem, 3.2dvh, 2.25rem);
 	}
 
 	thead,
+	tbody,
 	tfoot {
-		height: calc(100% / var(--rows));
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	thead,
+	tfoot {
+		flex: 1 1 auto;
 	}
 
 	tbody {
-		height: calc(100% * (var(--rows) - 2) / var(--rows));
+		flex: calc(var(--rows) - 2) 1 auto;
 	}
 
 	tr {
-		height: calc(100% / var(--rows));
+		display: flex;
+		flex: 1 1 auto;
+		min-height: 0;
+		min-width: 0;
 	}
 
 	td {
-		border: 1px solid black;
+		display: flex;
+		border: 0;
+		border-right: 1px solid black;
+		border-bottom: 1px solid black;
 		text-align: center;
 		padding: 0;
-		vertical-align: middle;
+		min-width: 0;
+		min-height: 0;
+		box-sizing: border-box;
 	}
 
 	td.round {
+		flex: 0 0 var(--round);
 		width: var(--round);
 	}
 
 	td.pcol {
-		width: calc((100% - var(--round)) / var(--players));
+		flex: 1 1 4.5ch;
+		min-width: 4.5ch;
 	}
 
 	td input,
@@ -206,10 +232,16 @@
 		text-align: center;
 		padding: 0;
 		margin: 0;
+		flex: 1 1 auto;
 		width: 100%;
-		height: 100%;
 		min-width: 0;
+		min-height: 0;
 		box-sizing: border-box;
+	}
+
+	td input:focus {
+		/* The ring stays inside the cell, so a focused row is not taller than the others. */
+		outline-offset: -2px;
 	}
 
 	td button {

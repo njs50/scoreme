@@ -141,6 +141,10 @@ test('fills the viewport and scrolls sideways once a score cannot fit', async ({
 	const viewport = page.viewportSize();
 	expect(before!.height).toBeGreaterThan(viewport!.height * 0.9);
 	expect(before!.width).toBeGreaterThan(viewport!.width * 0.9);
+	const rowHeights = await page
+		.locator('tbody tr')
+		.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+	expect(Math.max(...rowHeights) - Math.min(...rowHeights)).toBeLessThan(1);
 	expect(await sheet.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
 
 	const add = page.getByRole('button', { name: 'Add player' });
