@@ -1,12 +1,12 @@
 <script lang="ts">
 	import '../app.css';
+	import { previewLabel } from '#lib/preview.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
-	// Branch + short SHA. Only preview-deploy.yml sets these; production stays blank.
-	const previewWatermark =
-		__PREVIEW_REF__ && __PREVIEW_SHA__ ? `${__PREVIEW_REF__} · ${__PREVIEW_SHA__.slice(0, 7)}` : '';
+	// Only preview-deploy.yml sets these; production stays blank.
+	const previewWatermark = previewLabel(__PREVIEW_REF__, __PREVIEW_SHA__);
 </script>
 
 <main>
