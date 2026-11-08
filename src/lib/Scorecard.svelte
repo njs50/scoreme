@@ -162,15 +162,15 @@
 
 	table {
 		--round: 2.4em;
-		/* Percentage heights on table rows dump the leftover pixels onto the last
-		   scoring row, so the sheet is a flex column of equal rows instead. */
-		display: flex;
-		flex-direction: column;
+		/* One equal track per row. Table-row heights are only minimums, so the
+		   spare pixels were landing on the last scoring row. */
+		display: grid;
+		grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+		flex: 1 1 auto;
 		width: 100%;
 		/* A column stays wide enough for three digits, then the sheet scrolls sideways. */
 		min-width: calc(var(--round) + var(--players) * 4.5ch);
-		flex: 1 1 auto;
-		min-height: min-content;
+		min-height: calc(var(--rows) * 1.25em);
 		border-top: 1px solid black;
 		border-left: 1px solid black;
 		box-sizing: border-box;
@@ -180,23 +180,12 @@
 	thead,
 	tbody,
 	tfoot {
-		display: flex;
-		flex-direction: column;
-		min-height: 0;
-	}
-
-	thead,
-	tfoot {
-		flex: 1 1 auto;
-	}
-
-	tbody {
-		flex: calc(var(--rows) - 2) 1 auto;
+		display: contents;
 	}
 
 	tr {
-		display: flex;
-		flex: 1 1 auto;
+		display: grid;
+		grid-template-columns: var(--round) repeat(var(--players), minmax(4.5ch, 1fr));
 		min-height: 0;
 		min-width: 0;
 	}
@@ -211,16 +200,6 @@
 		min-width: 0;
 		min-height: 0;
 		box-sizing: border-box;
-	}
-
-	td.round {
-		flex: 0 0 var(--round);
-		width: var(--round);
-	}
-
-	td.pcol {
-		flex: 1 1 4.5ch;
-		min-width: 4.5ch;
 	}
 
 	td input,
@@ -258,18 +237,19 @@
 		display: block;
 	}
 
-	table thead,
-	table tfoot {
+	thead tr,
+	tfoot tr {
 		position: -webkit-sticky; /* Safari */
 		position: sticky;
+		z-index: 1;
 		background: white;
 	}
 
-	table thead {
+	thead tr {
 		inset-block-start: 0;
 	}
 
-	table tfoot {
+	tfoot tr {
 		inset-block-end: 0;
 	}
 </style>
