@@ -192,6 +192,8 @@
 
 	td {
 		display: flex;
+		align-items: center;
+		justify-content: center;
 		border: 0;
 		border-right: 1px solid black;
 		border-bottom: 1px solid black;
