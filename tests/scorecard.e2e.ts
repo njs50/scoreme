@@ -130,6 +130,36 @@ test('clears the saved game after confirmation', async ({ page }) => {
 	expect(dialogs).toEqual([]);
 });
 
+test('fills the viewport and scrolls sideways once a score cannot fit', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 800 });
+	await page.goto('');
+
+	const sheet = page.locator('section');
+	const table = page.locator('table');
+	await expect(table).toBeVisible();
+	const before = await table.boundingBox();
+	const viewport = page.viewportSize();
+	expect(before!.height).toBeGreaterThan(viewport!.height * 0.9);
+	expect(before!.width).toBeGreaterThan(viewport!.width * 0.9);
+	expect(await sheet.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+
+	const add = page.getByRole('button', { name: 'Add player' });
+	for (let i = 0; i < 8; i++) await add.click();
+	const cell = score(page, 'P1', '2');
+	await cell.fill('999');
+
+	expect(await sheet.evaluate((node) => node.scrollWidth > node.clientWidth + 1)).toBe(true);
+	const fits = await cell.evaluate((input) => input.scrollWidth <= input.clientWidth + 1);
+	expect(fits).toBe(true);
+
+	const [addBox, resetBox] = await Promise.all([
+		page.getByRole('button', { name: 'Add player' }).boundingBox(),
+		page.getByRole('button', { name: 'New game' }).boundingBox()
+	]);
+	expect(Math.abs(addBox!.x - resetBox!.x)).toBeLessThan(2);
+	expect(Math.abs(addBox!.width - resetBox!.width)).toBeLessThan(2);
+});
+
 test('publishes the build SHA', async ({ request }) => {
 	const body = await request.get('version.json').then((res) => res.json());
 	expect(body.sha).toBeTruthy();

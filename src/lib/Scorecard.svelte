@@ -85,21 +85,11 @@
 <svelte:window onbeforeunload={confirmLeave} />
 
 <section class:ready>
-	<table>
+	<table style:--players={players.length} style:--rows={ROUNDS.length + 2}>
 		<thead>
 			<tr>
 				<td class="round">
-					<span class="sheet-actions">
-						<button type="button" aria-label="Add player" onclick={addPlayer}>+</button>
-						<button type="button" aria-label="New game" onclick={newGame}>
-							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path
-									fill="currentColor"
-									d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6H5.02A7 7 0 1 0 17.65 6.35z"
-								/>
-							</svg>
-						</button>
-					</span>
+					<button type="button" aria-label="Add player" onclick={addPlayer}>+</button>
 				</td>
 				{#each players as player, idx (idx)}
 					<td class="pcol {colourClass(idx)}">
@@ -138,7 +128,16 @@
 
 		<tfoot>
 			<tr>
-				<td class="round">Total:</td>
+				<td class="round">
+					<button type="button" aria-label="New game" onclick={newGame}>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								fill="currentColor"
+								d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6H5.02A7 7 0 1 0 17.65 6.35z"
+							/>
+						</svg>
+					</button>
+				</td>
 				{#each totals as total, idx (idx)}
 					<td class="pcol {colourClass(idx)}" aria-label="{playerLabel(idx)} total">{total}</td>
 				{/each}
@@ -149,66 +148,82 @@
 
 <style>
 	section {
-		position: absolute;
-		height: 100%;
+		flex: 1;
+		min-height: 0;
+		min-width: 0;
+		overflow: auto;
+	}
+
+	section:not(.ready) {
+		visibility: hidden;
 	}
 
 	table {
-		max-width: 100%;
+		--round: 2.4em;
+		width: 100%;
+		/* A column stays wide enough for three digits, then the sheet scrolls sideways. */
+		min-width: calc(var(--round) + var(--players) * 4.5ch);
+		height: 100%;
+		border-collapse: collapse;
+		table-layout: fixed;
+		font-size: clamp(1rem, 3.2dvh, 2.25rem);
+	}
+
+	thead,
+	tfoot {
+		height: calc(100% / var(--rows));
+	}
+
+	tbody {
+		height: calc(100% * (var(--rows) - 2) / var(--rows));
+	}
+
+	tr {
+		height: calc(100% / var(--rows));
 	}
 
 	td {
 		border: 1px solid black;
 		text-align: center;
-		padding: 0.25em;
-	}
-
-	td.pcol {
-		min-width: 2.5rem;
+		padding: 0;
+		vertical-align: middle;
 	}
 
 	td.round {
-		width: 2.5rem;
+		width: var(--round);
 	}
 
-	td input {
+	td.pcol {
+		width: calc((100% - var(--round)) / var(--players));
+	}
+
+	td input,
+	td button {
 		border: none;
 		background: none;
-		display: inline-block;
+		color: inherit;
+		font: inherit;
 		text-align: center;
 		padding: 0;
+		margin: 0;
 		width: 100%;
-		max-width: 6em;
+		height: 100%;
+		min-width: 0;
+		box-sizing: border-box;
 	}
 
-	.sheet-actions {
-		display: inline-flex;
+	td button {
+		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.15rem;
-	}
-
-	.sheet-actions button {
-		border: none;
-		background: none;
-		font: inherit;
-		color: inherit;
-		padding: 0.1em;
-		line-height: 1;
 		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+		line-height: 1;
 	}
 
-	.sheet-actions svg {
-		width: 1em;
-		height: 1em;
+	td button svg {
+		width: 0.9em;
+		height: 0.9em;
 		display: block;
-	}
-
-	section:not(.ready) {
-		visibility: hidden;
 	}
 
 	table thead,
@@ -219,9 +234,10 @@
 	}
 
 	table thead {
-		inset-block-start: 0; /* "top" */
+		inset-block-start: 0;
 	}
+
 	table tfoot {
-		inset-block-end: 0; /* "bottom" */
+		inset-block-end: 0;
 	}
 </style>
