@@ -1,7 +1,18 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
+	import Keypad from './Keypad.svelte';
 	import { selectTextOnFocus, blurOnEscape } from './inputDirectives.ts';
+	import {
+		actionFromKey,
+		commitExpression,
+		entryFromScore,
+		formatExpression,
+		previewValue,
+		pressKey,
+		type Entry,
+		type Key
+	} from './keypad.ts';
 	import {
 		baseFromRoot,
 		blankGame,
@@ -49,7 +60,85 @@
 
 	let totals = $derived(playerTotals(scores, players.length));
 
+	// Scores use this keypad instead of the phone keyboard, which resizes the page.
+	let selection: { round: number; player: number } | null = $state(null);
+	let entry: Entry = $state({ expression: '', replace: false });
+
 	const playerLabel = (idx: number) => players[idx].name.trim() || `Player ${idx + 1}`;
+
+	const storeEntry = () => {
+		if (!selection) return;
+		const value = commitExpression(entry.expression);
+		if (value !== null) scores[selection.round][selection.player] = value;
+	};
+
+	const openCell = (round: number, player: number) => {
+		if (selection && (selection.round !== round || selection.player !== player)) storeEntry();
+		selection = { round, player };
+		entry = entryFromScore(scores[round][player] ?? '');
+	};
+
+	const closeKeypad = () => {
+		storeEntry();
+		selection = null;
+	};
+
+	const applyKey = (key: Key) => {
+		entry = pressKey(entry, key);
+		storeEntry();
+	};
+
+	const selectPlayer = (player: number) => {
+		if (player === selection!.player) return;
+		openCell(selection!.round, player);
+	};
+
+	const movePlayer = (step: number) => {
+		const player = selection!.player + step;
+		if (player < 0 || player >= players.length) return;
+		openCell(selection!.round, player);
+	};
+
+	const nextRow = () => {
+		const round = selection!.round + 1;
+		const player = selection!.player;
+		storeEntry();
+		if (round >= ROUNDS.length) {
+			selection = null;
+			return;
+		}
+		selection = { round, player };
+		entry = entryFromScore(scores[round][player] ?? '');
+	};
+
+	const onKeydown = (event: KeyboardEvent) => {
+		if (!selection) return;
+		const action = actionFromKey(event.key);
+		if (!action) return;
+		event.preventDefault();
+		if (action === 'close') closeKeypad();
+		else if (action === 'next-row') nextRow();
+		else if (action === 'prev-player') movePlayer(-1);
+		else if (action === 'next-player') movePlayer(1);
+		else applyKey(action);
+	};
+
+	const keypad = $derived.by(() => {
+		if (!selection) return null;
+		const { round, player } = selection;
+		return {
+			round: ROUNDS[round],
+			colour: colourClass(dealerIndex(round, players.length)),
+			active: player,
+			expression: formatExpression(entry.expression),
+			preview: previewValue(entry.expression),
+			chips: players.map((person, idx) => ({
+				label: person.name.trim() || `Player ${idx + 1}`,
+				score: scores[round][idx] ?? '',
+				colour: colourClass(idx)
+			}))
+		};
+	});
 
 	const confirmLeave = (e: BeforeUnloadEvent) => {
 		const game = snapshot();
@@ -72,6 +161,7 @@
 	};
 
 	const newGame = () => {
+		closeKeypad();
 		if (
 			!sameGame(snapshot(), blankGame()) &&
 			!confirm('Start a new game? This clears the scores saved on this device.')
@@ -82,7 +172,7 @@
 	};
 </script>
 
-<svelte:window onbeforeunload={confirmLeave} />
+<svelte:window onbeforeunload={confirmLeave} onkeydown={onKeydown} />
 
 <section class:ready>
 	<table style:--players={players.length} style:--rows={ROUNDS.length + 2}>
@@ -99,6 +189,7 @@
 							bind:value={player.name}
 							use:selectTextOnFocus
 							use:blurOnEscape
+							onfocus={closeKeypad}
 						/>
 					</td>
 				{/each}
@@ -113,13 +204,12 @@
 					>
 					{#each row, idx (idx)}
 						<td class="pcol {colourClass(idx)}">
-							<input
-								type="tel"
+							<button
+								type="button"
 								aria-label="{playerLabel(idx)} score, round {ROUNDS[roundIdx]}"
-								bind:value={row[idx]}
-								use:selectTextOnFocus
-								use:blurOnEscape
-							/>
+								aria-pressed={selection?.round === roundIdx && selection.player === idx}
+								onclick={() => openCell(roundIdx, idx)}>{row[idx]}</button
+							>
 						</td>
 					{/each}
 				</tr>
@@ -145,6 +235,21 @@
 		</tfoot>
 	</table>
 </section>
+
+{#if keypad}
+	<Keypad
+		round={keypad.round}
+		colour={keypad.colour}
+		chips={keypad.chips}
+		active={keypad.active}
+		expression={keypad.expression}
+		preview={keypad.preview}
+		onSelect={selectPlayer}
+		onKey={applyKey}
+		onNext={nextRow}
+		onClose={closeKeypad}
+	/>
+{/if}
 
 <style>
 	section {
@@ -214,14 +319,18 @@
 		padding: 0;
 		margin: 0;
 		flex: 1 1 auto;
+		align-self: stretch;
 		width: 100%;
 		min-width: 0;
 		min-height: 0;
 		box-sizing: border-box;
 	}
 
-	td input:focus {
+	td input:focus,
+	td button:focus-visible,
+	td button[aria-pressed='true'] {
 		/* The ring stays inside the cell, so a focused row is not taller than the others. */
+		outline: 2px solid black;
 		outline-offset: -2px;
 	}
 

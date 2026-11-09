@@ -46,7 +46,8 @@ test('registers a service worker scoped to the base path', async ({ page }) => {
 test('keeps a saved game when reloaded offline', async ({ page, context }) => {
 	await waitForServiceWorker(page);
 	await page.getByLabel('Player 1 name').fill('Greer');
-	await page.getByLabel('Greer score, round 2', { exact: true }).fill('8');
+	await page.getByLabel('Greer score, round 2', { exact: true }).click();
+	await page.keyboard.type('8');
 	await expect
 		.poll(() => page.evaluate(() => localStorage.getItem('scoreme:/scoreme')))
 		.toContain('Greer');
@@ -54,7 +55,7 @@ test('keeps a saved game when reloaded offline', async ({ page, context }) => {
 	await context.setOffline(true);
 	await page.reload();
 	await expect(page.getByLabel('Player 1 name')).toHaveValue('Greer');
-	await expect(page.getByLabel('Greer score, round 2', { exact: true })).toHaveValue('8');
+	await expect(page.getByLabel('Greer score, round 2', { exact: true })).toHaveText('8');
 	await expect(page.getByLabel('Greer total', { exact: true })).toHaveText('8');
 });
 
@@ -66,7 +67,8 @@ test('works offline once loaded', async ({ page, context }) => {
 	await expect(page).toHaveTitle('Score');
 	await expect(page.locator('tbody tr')).toHaveCount(13);
 
-	await page.getByLabel('P1 score, round 2', { exact: true }).fill('5');
+	await page.getByLabel('P1 score, round 2', { exact: true }).click();
+	await page.keyboard.type('5');
 	await expect(page.getByLabel('P1 total', { exact: true })).toHaveText('5');
 });
 
