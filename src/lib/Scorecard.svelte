@@ -8,8 +8,10 @@
 		commitExpression,
 		entryFromScore,
 		formatExpression,
+		appliedShift,
 		previewValue,
 		pressKey,
+		sheetShift,
 		type Entry,
 		type Key
 	} from './keypad.ts';
@@ -63,6 +65,9 @@
 	// Scores use this keypad instead of the phone keyboard, which resizes the page.
 	let selection: { round: number; player: number } | null = $state(null);
 	let entry: Entry = $state({ expression: '', replace: false });
+	let sectionEl: HTMLElement | null = $state(null);
+	// How far the sheet has slid up so the selected row clears the keypad.
+	let shift = $state(0);
 
 	const playerLabel = (idx: number) => players[idx].name.trim() || `Player ${idx + 1}`;
 
@@ -123,6 +128,38 @@
 		else applyKey(action);
 	};
 
+	// Slide the whole sheet, rather than squashing the rows, when the keypad would cover one.
+	$effect(() => {
+		const section = sectionEl;
+		if (selection === null || !section) {
+			shift = 0;
+			return;
+		}
+		const round = selection.round;
+		const measure = () => {
+			const row = section.querySelector(`tbody tr:nth-child(${round + 1})`) as HTMLElement;
+			const pad = document.querySelector('[aria-label="Score keypad"]') as HTMLElement;
+			const rect = row.getBoundingClientRect();
+			const applied = appliedShift(getComputedStyle(row.closest('table')!).transform);
+			shift = sheetShift(
+				rect.top - applied,
+				rect.bottom - applied,
+				section.getBoundingClientRect().top,
+				window.innerHeight - pad.offsetHeight
+			);
+		};
+		measure();
+		const pad = document.querySelector('[aria-label="Score keypad"]') as HTMLElement;
+		const observer = new ResizeObserver(measure);
+		observer.observe(section);
+		observer.observe(pad);
+		window.addEventListener('resize', measure);
+		return () => {
+			observer.disconnect();
+			window.removeEventListener('resize', measure);
+		};
+	});
+
 	const keypad = $derived.by(() => {
 		if (!selection) return null;
 		const { round, player } = selection;
@@ -174,8 +211,12 @@
 
 <svelte:window onbeforeunload={confirmLeave} onkeydown={onKeydown} />
 
-<section class:ready>
-	<table style:--players={players.length} style:--rows={ROUNDS.length + 2}>
+<section class:ready bind:this={sectionEl}>
+	<table
+		style:--players={players.length}
+		style:--rows={ROUNDS.length + 2}
+		style:transform="translateY({-shift}px)"
+	>
 		<thead>
 			<tr>
 				<td class="round">
@@ -267,6 +308,7 @@
 
 	table {
 		--round: 2.4em;
+		transition: transform 280ms ease;
 		/* One equal track per row. Table-row heights are only minimums, so the
 		   spare pixels were landing on the last scoring row. */
 		display: grid;
@@ -362,5 +404,11 @@
 
 	tfoot tr {
 		inset-block-end: 0;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		table {
+			transition: none;
+		}
 	}
 </style>

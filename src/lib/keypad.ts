@@ -12,6 +12,7 @@ export type Key =
 	| '9'
 	| '+'
 	| '-'
+	| '*'
 	| 'backspace'
 	| 'clear'
 	| 'equals';
@@ -35,16 +36,42 @@ export function entryFromScore(score: string): Entry {
 /**
  * The score to store for an expression.
  * '' clears the cell. null leaves it alone (a lone "-" is not a score yet).
- * A trailing + or - is ignored, so "12+" is still 12.
+ * A trailing operator is ignored, so "12+" is still 12. Multiplication happens
+ * before addition and subtraction, so "10+2*3" is 16.
  */
 export function commitExpression(expression: string): string | null {
 	if (expression === '') return '';
-	const match = /^(-?\d+)((?:[+-]\d+)*)([+-])?$/.exec(expression);
-	if (!match) return null;
-	let value = Number.parseInt(match[1], 10);
-	for (const part of match[2].matchAll(/([+-])(\d+)/g)) {
-		const amount = Number.parseInt(part[2], 10);
-		value = part[1] === '+' ? value + amount : value - amount;
+	const body = /[+\-*]$/.test(expression) ? expression.slice(0, -1) : expression;
+	if (body === '' || body === '-') return null;
+	// A minus only leads the first number. Later minuses are subtraction.
+	const negative = body.startsWith('-');
+	const source = negative ? body.slice(1) : body;
+	const tokens = [...source.matchAll(/(\d+)|([+\-*])/g)];
+	if (tokens.map((token) => token[0]).join('') !== source) return null;
+
+	let index = 0;
+	const readProduct = (): number | null => {
+		if (!tokens[index]?.[1]) return null;
+		let value = Number(tokens[index][1]);
+		index += 1;
+		while (tokens[index]?.[2] === '*') {
+			index += 1;
+			if (!tokens[index]?.[1]) return null;
+			value *= Number(tokens[index][1]);
+			index += 1;
+		}
+		return value;
+	};
+
+	const first = readProduct();
+	if (first === null) return null;
+	let value = negative ? -first : first;
+	while (index < tokens.length) {
+		const operator = tokens[index]?.[2];
+		index += 1;
+		const next = readProduct();
+		if (next === null) return null;
+		value = operator === '+' ? value + next : value - next;
 	}
 	return String(value);
 }
@@ -58,7 +85,9 @@ export function previewValue(expression: string): string | null {
 
 /** Spaces around the operators, leaving a leading minus attached to its digit. */
 export function formatExpression(expression: string): string {
-	return expression.replace(/(?<=\d)([+-])/g, ' $1 ');
+	return expression.replace(/(?<=\d)([+\-*])/g, (operator) =>
+		operator === '*' ? ' × ' : ` ${operator} `
+	);
 }
 
 /** Map a physical key to a keypad action. Anything else is ignored. */
@@ -67,6 +96,7 @@ export function actionFromKey(key: string): Action | null {
 	switch (key) {
 		case '+':
 		case '-':
+		case '*':
 			return key;
 		case 'Backspace':
 			return 'backspace';
@@ -89,7 +119,7 @@ export function actionFromKey(key: string): Action | null {
 function appendDigit(expression: string, digit: string): string {
 	if (expression === '0') return digit;
 	if (expression === '-0') return `-${digit}`;
-	if (/[+-]0$/.test(expression)) return expression.slice(0, -1) + digit;
+	if (/[+\-*]0$/.test(expression)) return expression.slice(0, -1) + digit;
 	if (expression.length >= MAX_EXPRESSION_LENGTH) return expression;
 	return expression + digit;
 }
@@ -106,7 +136,7 @@ export function pressKey(entry: Entry, key: Key): Entry {
 		if (committed === null) return entry;
 		return { expression: committed, replace: true };
 	}
-	if (key === '+' || key === '-') {
+	if (key === '+' || key === '-' || key === '*') {
 		if (entry.replace) {
 			if (entry.expression === '') {
 				return key === '-' ? { expression: '-', replace: false } : entry;
@@ -116,7 +146,7 @@ export function pressKey(entry: Entry, key: Key): Entry {
 		if (entry.expression === '' || entry.expression === '-') {
 			return key === '-' ? { expression: '-', replace: false } : entry;
 		}
-		if (/[+-]$/.test(entry.expression)) {
+		if (/[+\-*]$/.test(entry.expression)) {
 			return { expression: entry.expression.slice(0, -1) + key, replace: false };
 		}
 		if (entry.expression.length >= MAX_EXPRESSION_LENGTH) return entry;
@@ -124,6 +154,29 @@ export function pressKey(entry: Entry, key: Key): Entry {
 	}
 	if (entry.replace) return { expression: key, replace: false };
 	return { expression: appendDigit(entry.expression, key), replace: false };
+}
+
+/**
+ * How far to slide the sheet up so a row sits inside the band above the keypad.
+ * Zero when the row is already in that band, or already flush with the top.
+ */
+export function sheetShift(
+	rowTop: number,
+	rowBottom: number,
+	visibleTop: number,
+	visibleBottom: number
+): number {
+	const overlap = rowBottom - visibleBottom;
+	if (overlap <= 0) return 0;
+	const room = rowTop - visibleTop;
+	if (room <= 0) return 0;
+	return Math.round(Math.min(overlap, room));
+}
+
+/** The translateY already applied to the sheet, so a measurement can ignore it. */
+export function appliedShift(transform: string): number {
+	const match = /matrix\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,\s*(-?[\d.]+)\)/.exec(transform);
+	return match ? Number(match[1]) : 0;
 }
 
 /** Keep the active player chip inside the row scroller without moving the page. */

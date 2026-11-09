@@ -54,6 +54,6 @@ scoreme is a PWA with no runtime dependencies. The manifest comes from `vite/web
 
 The current game is written to `localStorage` on each edit (`src/lib/savedGame.ts`), so a reload or the phone closing the app keeps the names and scores. The storage key includes the base path too, and production and preview keep separate games. The refresh icon in the totals corner clears the saved sheet after a confirmation. The sheet stretches to fill the screen and scrolls sideways once a column would be too narrow for a three-digit score.
 
-Scores are entered with the on-screen keypad (`src/lib/Keypad.svelte`), not the phone keyboard, so opening it does not resize the sheet. It shows the round you are on, accepts numbers and a running `+` or `-`, and can move to the next round or close.
+Scores are entered with the on-screen keypad (`src/lib/Keypad.svelte`), not the phone keyboard, so the rows stay the same height. It shows the round you are on, takes numbers, and can add, subtract, or multiply. If the keypad would cover the selected row, the sheet slides up to keep that row in view, then slides back when the keypad closes.
 
 Icons are rendered from `static/icons/icon.svg` with `pnpm icons` (uses Playwright's Chromium); commit the regenerated PNGs.

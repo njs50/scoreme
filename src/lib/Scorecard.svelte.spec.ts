@@ -14,6 +14,7 @@ const total = (player: string) => page.getByLabelText(`${player} total`, { exact
 const keyLabel: Record<string, string> = {
 	'+': 'Add',
 	'-': 'Subtract',
+	'*': 'Multiply',
 	'=': 'Equals',
 	C: 'Clear',
 	'<': 'Delete'

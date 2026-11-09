@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
 	actionFromKey,
+	appliedShift,
 	chipScrollLeft,
 	commitExpression,
 	entryFromScore,
 	formatExpression,
 	previewValue,
 	pressKey,
+	sheetShift,
 	type Entry,
 	type Key
 } from './keypad.ts';
@@ -21,11 +23,16 @@ describe('entryFromScore', () => {
 });
 
 describe('commitExpression', () => {
-	it('evaluates addition and subtraction from left to right', () => {
+	it('evaluates addition and subtraction from left to right, and multiplication first', () => {
 		expect(commitExpression('1+2-3')).toBe('0');
 		expect(commitExpression('1-2+3')).toBe('2');
 		expect(commitExpression('-5+2')).toBe('-3');
 		expect(commitExpression('3000000000')).toBe('3000000000');
+		expect(commitExpression('2*3')).toBe('6');
+		expect(commitExpression('10+2*3')).toBe('16');
+		expect(commitExpression('10*2+3')).toBe('23');
+		expect(commitExpression('-4*5')).toBe('-20');
+		expect(commitExpression('2*3*4')).toBe('24');
 	});
 
 	it('ignores a trailing operator and turns -0 into 0', () => {
@@ -34,9 +41,15 @@ describe('commitExpression', () => {
 		expect(commitExpression('-0')).toBe('0');
 	});
 
-	it('clears on an empty expression and waits while the minus is unfinished', () => {
+	it('clears on an empty expression and waits while the entry is unfinished', () => {
 		expect(commitExpression('')).toBe('');
 		expect(commitExpression('-')).toBeNull();
+		expect(commitExpression('--')).toBeNull();
+		expect(commitExpression('*')).toBeNull();
+		expect(commitExpression('+5')).toBeNull();
+		expect(commitExpression('10++')).toBeNull();
+		expect(commitExpression('10*+2')).toBeNull();
+		expect(commitExpression('12.5')).toBeNull();
 	});
 });
 
@@ -44,6 +57,7 @@ describe('previewValue', () => {
 	it('shows a result only once the expression is more than that result', () => {
 		expect(previewValue('1+2')).toBe('3');
 		expect(previewValue('1+')).toBe('1');
+		expect(previewValue('2*')).toBe('2');
 		expect(previewValue('3')).toBeNull();
 		expect(previewValue('')).toBeNull();
 		expect(previewValue('-')).toBeNull();
@@ -53,6 +67,7 @@ describe('previewValue', () => {
 describe('formatExpression', () => {
 	it('spaces operators without detaching a leading minus', () => {
 		expect(formatExpression('1+2-3')).toBe('1 + 2 - 3');
+		expect(formatExpression('10+2*3')).toBe('10 + 2 × 3');
 		expect(formatExpression('-5+2')).toBe('-5 + 2');
 		expect(formatExpression('-5')).toBe('-5');
 		expect(formatExpression('')).toBe('');
@@ -64,6 +79,7 @@ describe('actionFromKey', () => {
 		['5', '5'],
 		['+', '+'],
 		['-', '-'],
+		['*', '*'],
 		['Backspace', 'backspace'],
 		['Enter', 'equals'],
 		['=', 'equals'],
@@ -108,6 +124,7 @@ describe('pressKey', () => {
 		expect(pressKey(entry(''), '-')).toEqual(entry('-'));
 		const blank = entry('');
 		expect(pressKey(blank, '+')).toBe(blank);
+		expect(pressKey(blank, '*')).toBe(blank);
 		expect(pressKey(entry('-'), '-')).toEqual(entry('-'));
 		const negative = entry('-');
 		expect(pressKey(negative, '+')).toBe(negative);
@@ -115,6 +132,8 @@ describe('pressKey', () => {
 
 	it('swaps a trailing operator and refuses to grow past the display', () => {
 		expect(pressKey(entry('8+'), '-')).toEqual(entry('8-'));
+		expect(pressKey(entry('8-'), '*')).toEqual(entry('8*'));
+		expect(pressKey(entry('8', true), '*')).toEqual(entry('8*'));
 		expect(pressKey(entry('8-'), '+')).toEqual(entry('8+'));
 		const full = entry('123456789012');
 		expect(pressKey(full, '+')).toBe(full);
@@ -129,8 +148,26 @@ describe('pressKey', () => {
 		expect(type('0', '5')).toEqual(entry('5'));
 		expect(type('-0', '5')).toEqual(entry('-5'));
 		expect(type('1+0', '5')).toEqual(entry('1+5'));
+		expect(type('1*0', '5')).toEqual(entry('1*5'));
 		expect(type('1+0', '0')).toEqual(entry('1+0'));
 		expect(pressKey(entry('123456789012'), '4')).toEqual(entry('123456789012'));
+	});
+});
+
+describe('sheetShift', () => {
+	it('slides a covered row up, and leaves a visible row where it is', () => {
+		expect(sheetShift(40, 80, 0, 500)).toBe(0);
+		expect(sheetShift(700, 760, 0, 500)).toBe(260);
+		expect(sheetShift(10, 400, 0, 200)).toBe(10);
+		expect(sheetShift(-20, 40, 0, 30)).toBe(0);
+	});
+});
+
+describe('appliedShift', () => {
+	it('reads the translate already on the sheet', () => {
+		expect(appliedShift('none')).toBe(0);
+		expect(appliedShift('')).toBe(0);
+		expect(appliedShift('matrix(1, 0, 0, 1, 0, -40)')).toBe(-40);
 	});
 });
 

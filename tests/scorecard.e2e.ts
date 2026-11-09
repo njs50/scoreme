@@ -207,6 +207,39 @@ test('the keypad covers the sheet without moving it', async ({ page }) => {
 	await expect(total(page, 'P1')).toHaveText('15');
 });
 
+test('slides a covered row above the keypad and back when it closes', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('');
+	const table = page.locator('table');
+	const before = (await table.boundingBox())!;
+
+	await score(page, 'P1', 'K').click();
+	await page.keyboard.type('4*5');
+
+	const cell = score(page, 'P1', 'K');
+	const keypad = page.getByRole('dialog', { name: 'Score keypad' });
+	const viewport = page.viewportSize()!;
+	// The keypad rises in over the sheet. Wait until it has settled, then the row should have slid with it.
+	await expect
+		.poll(async () => {
+			const pad = (await keypad.boundingBox())!;
+			return Math.abs(pad.y + pad.height - viewport.height);
+		})
+		.toBeLessThan(2);
+	const rested = (await keypad.boundingBox())!;
+	const row = (await cell.boundingBox())!;
+	expect(row.y + row.height).toBeLessThanOrEqual(rested.y + 1);
+	expect((await table.boundingBox())!.y).toBeLessThan(before.y - 20);
+	await expect(cell).toHaveText('20');
+	await expect(keypad).toContainText('4 × 5');
+
+	await page.keyboard.press('Escape');
+	await expect(keypad).toHaveCount(0);
+	await expect
+		.poll(async () => Math.abs((await table.boundingBox())!.y - before.y))
+		.toBeLessThan(1);
+});
+
 test('publishes the build SHA', async ({ request }) => {
 	const body = await request.get('version.json').then((res) => res.json());
 	expect(body.sha).toBeTruthy();
