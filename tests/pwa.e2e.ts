@@ -70,6 +70,28 @@ test('works offline once loaded', async ({ page, context }) => {
 	await expect(page.getByLabel('P1 total', { exact: true })).toHaveText('5');
 });
 
+test('stays quiet when the served build is the one already running', async ({ page }) => {
+	const seen = page.waitForResponse('**/version.json');
+	await page.goto('');
+	await seen;
+	await expect(page.getByRole('button', { name: 'Click here to update' })).toHaveCount(0);
+});
+
+test('offers a reload when a newer build is published', async ({ page }) => {
+	await page.route('**/version.json', (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({ sha: 'newer-build', builtAt: '2026-01-01T00:00:00.000Z' })
+		})
+	);
+	await page.goto('');
+	const button = page.getByRole('button', { name: 'Click here to update' });
+	await expect(button).toBeVisible();
+	await Promise.all([page.waitForEvent('framenavigated'), button.click()]);
+	await expect(button).toBeVisible();
+});
+
 test('never serves version.json from the cache', async ({ page, context }) => {
 	await waitForServiceWorker(page);
 	expect(

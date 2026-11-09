@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import AppUpdate from '#lib/AppUpdate.svelte';
 	import { previewLabel } from '#lib/preview.ts';
 	import type { LayoutProps } from './$types';
 
@@ -10,6 +11,7 @@
 </script>
 
 <main>
+	<AppUpdate runningSha={__BUILD_SHA__} />
 	{@render children()}
 </main>
 
