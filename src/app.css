@@ -1,3 +1,19 @@
+html,
+body,
+body > div {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+}
+
+body > div {
+	display: flex;
+	flex-direction: column;
+	height: 100dvh;
+}
+
 .player0 {
 	background-color: hsl(36, 80%, 80%);
 }

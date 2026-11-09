@@ -85,21 +85,11 @@
 <svelte:window onbeforeunload={confirmLeave} />
 
 <section class:ready>
-	<table>
+	<table style:--players={players.length} style:--rows={ROUNDS.length + 2}>
 		<thead>
 			<tr>
 				<td class="round">
-					<span class="sheet-actions">
-						<button type="button" aria-label="Add player" onclick={addPlayer}>+</button>
-						<button type="button" aria-label="New game" onclick={newGame}>
-							<svg viewBox="0 0 24 24" aria-hidden="true">
-								<path
-									fill="currentColor"
-									d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6H5.02A7 7 0 1 0 17.65 6.35z"
-								/>
-							</svg>
-						</button>
-					</span>
+					<button type="button" aria-label="Add player" onclick={addPlayer}>+</button>
 				</td>
 				{#each players as player, idx (idx)}
 					<td class="pcol {colourClass(idx)}">
@@ -138,7 +128,16 @@
 
 		<tfoot>
 			<tr>
-				<td class="round">Total:</td>
+				<td class="round">
+					<button type="button" aria-label="New game" onclick={newGame}>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								fill="currentColor"
+								d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6H5.02A7 7 0 1 0 17.65 6.35z"
+							/>
+						</svg>
+					</button>
+				</td>
 				{#each totals as total, idx (idx)}
 					<td class="pcol {colourClass(idx)}" aria-label="{playerLabel(idx)} total">{total}</td>
 				{/each}
@@ -149,79 +148,110 @@
 
 <style>
 	section {
-		position: absolute;
-		height: 100%;
-	}
-
-	table {
-		max-width: 100%;
-	}
-
-	td {
-		border: 1px solid black;
-		text-align: center;
-		padding: 0.25em;
-	}
-
-	td.pcol {
-		min-width: 2.5rem;
-	}
-
-	td.round {
-		width: 2.5rem;
-	}
-
-	td input {
-		border: none;
-		background: none;
-		display: inline-block;
-		text-align: center;
-		padding: 0;
-		width: 100%;
-		max-width: 6em;
-	}
-
-	.sheet-actions {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.15rem;
-	}
-
-	.sheet-actions button {
-		border: none;
-		background: none;
-		font: inherit;
-		color: inherit;
-		padding: 0.1em;
-		line-height: 1;
-		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.sheet-actions svg {
-		width: 1em;
-		height: 1em;
-		display: block;
+		flex: 1;
+		min-height: 0;
+		min-width: 0;
+		overflow: auto;
+		display: flex;
+		flex-direction: column;
 	}
 
 	section:not(.ready) {
 		visibility: hidden;
 	}
 
-	table thead,
-	table tfoot {
+	table {
+		--round: 2.4em;
+		/* One equal track per row. Table-row heights are only minimums, so the
+		   spare pixels were landing on the last scoring row. */
+		display: grid;
+		grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+		flex: 1 1 auto;
+		width: 100%;
+		/* A column stays wide enough for three digits, then the sheet scrolls sideways. */
+		min-width: calc(var(--round) + var(--players) * 4.5ch);
+		min-height: calc(var(--rows) * 1.25em);
+		border-top: 1px solid black;
+		border-left: 1px solid black;
+		box-sizing: border-box;
+		font-size: clamp(1rem, 3.2dvh, 2.25rem);
+	}
+
+	thead,
+	tbody,
+	tfoot {
+		display: contents;
+	}
+
+	tr {
+		display: grid;
+		grid-template-columns: var(--round) repeat(var(--players), minmax(4.5ch, 1fr));
+		min-height: 0;
+		min-width: 0;
+	}
+
+	td {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 0;
+		border-right: 1px solid black;
+		border-bottom: 1px solid black;
+		text-align: center;
+		padding: 0;
+		min-width: 0;
+		min-height: 0;
+		box-sizing: border-box;
+	}
+
+	td input,
+	td button {
+		border: none;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: center;
+		padding: 0;
+		margin: 0;
+		flex: 1 1 auto;
+		width: 100%;
+		min-width: 0;
+		min-height: 0;
+		box-sizing: border-box;
+	}
+
+	td input:focus {
+		/* The ring stays inside the cell, so a focused row is not taller than the others. */
+		outline-offset: -2px;
+	}
+
+	td button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		line-height: 1;
+	}
+
+	td button svg {
+		width: 0.9em;
+		height: 0.9em;
+		display: block;
+	}
+
+	thead tr,
+	tfoot tr {
 		position: -webkit-sticky; /* Safari */
 		position: sticky;
+		z-index: 1;
 		background: white;
 	}
 
-	table thead {
-		inset-block-start: 0; /* "top" */
+	thead tr {
+		inset-block-start: 0;
 	}
-	table tfoot {
-		inset-block-end: 0; /* "bottom" */
+
+	tfoot tr {
+		inset-block-end: 0;
 	}
 </style>

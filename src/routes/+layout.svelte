@@ -22,11 +22,12 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding: 0.5rem;
+		min-height: 0;
+		min-width: 0;
 		width: 100%;
-		max-width: 1024px;
-		margin: 0 auto;
 		box-sizing: border-box;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+			env(safe-area-inset-left);
 	}
 
 	.preview-watermark {
