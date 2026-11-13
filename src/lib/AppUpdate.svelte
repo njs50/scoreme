@@ -11,7 +11,7 @@
 	let {
 		runningSha,
 		versionUrl = 'version.json',
-		intervalMs = 60_000,
+		intervalMs = 300_000,
 		fetchImpl = globalThis.fetch,
 		reload = reloadPage,
 		serviceWorker = globalThis.navigator?.serviceWorker ?? null
