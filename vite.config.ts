@@ -80,7 +80,8 @@ export default defineConfig(({ command, isPreview }) => ({
 	],
 	define: {
 		__PREVIEW_REF__: JSON.stringify(process.env.PUBLIC_PREVIEW_REF ?? ''),
-		__PREVIEW_SHA__: JSON.stringify(process.env.PUBLIC_PREVIEW_SHA ?? '')
+		__PREVIEW_SHA__: JSON.stringify(process.env.PUBLIC_PREVIEW_SHA ?? ''),
+		__BUILD_SHA__: JSON.stringify(buildSha())
 	},
 	server: {
 		host: '0.0.0.0'
@@ -109,7 +110,8 @@ export default defineConfig(({ command, isPreview }) => ({
 				extends: './vite.config.ts',
 				define: {
 					__PREVIEW_REF__: JSON.stringify('test-branch'),
-					__PREVIEW_SHA__: JSON.stringify('abcdef1234567890')
+					__PREVIEW_SHA__: JSON.stringify('abcdef1234567890'),
+					__BUILD_SHA__: JSON.stringify('test-build')
 				},
 				test: {
 					name: 'client',

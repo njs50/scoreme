@@ -59,7 +59,9 @@ async function cacheFirst(request: Request): Promise<Response> {
 
 async function networkFirst(request: Request): Promise<Response> {
 	try {
-		return await fetchAndCache(request);
+		// Revalidate. A plain fetch can be answered by the HTTP cache for minutes,
+		// which is long enough that "click here to update" would reload the old page.
+		return await fetchAndCache(request, 'no-cache');
 	} catch (error) {
 		const cached = await caches.match(request, MATCH);
 		if (cached) return cached;
@@ -67,8 +69,8 @@ async function networkFirst(request: Request): Promise<Response> {
 	}
 }
 
-async function fetchAndCache(request: Request): Promise<Response> {
-	const response = await fetch(request);
+async function fetchAndCache(request: Request, cache?: RequestCache): Promise<Response> {
+	const response = await fetch(request, cache ? { cache } : undefined);
 	if (response.ok && response.type === 'basic') {
 		const cache = await caches.open(CACHE);
 		await cache.put(request, response.clone());
