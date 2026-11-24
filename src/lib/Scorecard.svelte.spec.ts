@@ -11,6 +11,29 @@ const score = (player: string, round: string) =>
 	page.getByLabelText(`${player} score, round ${round}`, { exact: true });
 const total = (player: string) => page.getByLabelText(`${player} total`, { exact: true });
 
+const keyLabel: Record<string, string> = {
+	'+': 'Add',
+	'-': 'Subtract',
+	'*': 'Multiply',
+	'=': 'Equals',
+	C: 'Clear',
+	'<': 'Delete'
+};
+
+/** Close the keypad, then tap a cell and type. "=" collapses the expression. */
+async function enterScore(player: string, round: string, keys: string) {
+	keydown('Escape');
+	await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+	await score(player, round).click();
+	for (const char of keys) {
+		await page.getByRole('button', { name: keyLabel[char] ?? char, exact: true }).click();
+	}
+}
+
+function keydown(key: string) {
+	window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+}
+
 function unloadPrevented() {
 	const event = new Event('beforeunload', { cancelable: true });
 	window.dispatchEvent(event);
@@ -40,13 +63,15 @@ describe('Scorecard', () => {
 	it('totals each player as scores are entered', async () => {
 		await render(Scorecard);
 
-		await score('P1', '2').fill('5');
-		await score('P1', '3').fill('10');
-		await score('P2', '2').fill('7');
-		await score('P2', 'A').fill('not a number');
+		await enterScore('P1', '2', '10+5=');
+		await enterScore('P1', '3', '10');
+		await enterScore('P2', '2', '7');
+		await enterScore('P2', 'A', '20-3');
 
-		await expect.element(total('P1')).toHaveTextContent('15');
-		await expect.element(total('P2')).toHaveTextContent('7');
+		await expect.element(total('P1')).toHaveTextContent('25');
+		await expect.element(total('P2')).toHaveTextContent('24');
+		await expect.element(score('P1', '2')).toHaveTextContent('15');
+		await expect.element(score('P2', 'A')).toHaveTextContent('17');
 	});
 
 	it('adds a player with an empty column', async () => {
@@ -55,7 +80,7 @@ describe('Scorecard', () => {
 		await page.getByRole('button', { name: 'Add player' }).click();
 
 		await expect.element(page.getByLabelText('Player 3 name')).toHaveValue('P3');
-		await score('P3', '4').fill('3');
+		await enterScore('P3', '4', '3');
 		await expect.element(total('P3')).toHaveTextContent('3');
 	});
 
@@ -63,7 +88,7 @@ describe('Scorecard', () => {
 		await render(Scorecard);
 
 		await page.getByLabelText('Player 1 name').fill('Greer');
-		await score('Greer', '2').fill('4');
+		await enterScore('Greer', '2', '4');
 		await expect.element(total('Greer')).toHaveTextContent('4');
 
 		await page.getByLabelText('Player 1 name').fill('  ');
@@ -95,14 +120,14 @@ describe('Scorecard', () => {
 		const first = await render(Scorecard);
 		await page.getByLabelText('Player 1 name').fill('Ada');
 		await page.getByRole('button', { name: 'Add player' }).click();
-		await score('Ada', '2').fill('4');
+		await enterScore('Ada', '2', '4');
 		await expect.poll(() => localStorage.getItem(KEY)).toContain('Ada');
 		await first.unmount();
 
 		await render(Scorecard);
 		await expect.element(page.getByLabelText('Player 1 name')).toHaveValue('Ada');
 		await expect.element(page.getByLabelText('Player 3 name')).toHaveValue('P3');
-		await expect.element(score('Ada', '2')).toHaveValue('4');
+		await expect.element(score('Ada', '2')).toHaveTextContent('4');
 		await expect.element(total('Ada')).toHaveTextContent('4');
 	});
 
@@ -116,7 +141,7 @@ describe('Scorecard', () => {
 		await render(Scorecard);
 		expect(unloadPrevented()).toBe(false);
 
-		await score('P1', '2').fill('5');
+		await enterScore('P1', '2', '5');
 		expect(unloadPrevented()).toBe(false);
 		expect(localStorage.getItem(KEY)).toContain('5');
 	});
@@ -126,7 +151,7 @@ describe('Scorecard', () => {
 			throw new DOMException('quota', 'QuotaExceededError');
 		});
 		await render(Scorecard);
-		await score('P1', '2').fill('5');
+		await enterScore('P1', '2', '5');
 		expect(unloadPrevented()).toBe(true);
 	});
 
@@ -156,10 +181,11 @@ describe('Scorecard', () => {
 	it('clears a scored game only after confirmation', async () => {
 		const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
 		await render(Scorecard);
-		await score('P1', '2').fill('5');
+		await enterScore('P1', '2', '5');
+		keydown('Escape');
 
 		await page.getByRole('button', { name: 'New game' }).click();
-		await expect.element(score('P1', '2')).toHaveValue('5');
+		await expect.element(score('P1', '2')).toHaveTextContent('5');
 		expect(confirm).toHaveBeenCalledWith(
 			'Start a new game? This clears the scores saved on this device.'
 		);
@@ -167,7 +193,97 @@ describe('Scorecard', () => {
 		confirm.mockReturnValue(true);
 		await page.getByRole('button', { name: 'New game' }).click();
 		await expect.element(page.getByLabelText('Player 1 name')).toHaveValue('P1');
-		await expect.element(score('P1', '2')).toHaveValue('');
+		await expect
+			.poll(() => document.querySelector('[aria-label="P1 score, round 2"]')?.textContent)
+			.toBe('');
 		await expect.poll(() => localStorage.getItem(KEY)).not.toContain('5');
+	});
+
+	it('enters a score from the keypad without a text field', async () => {
+		const { container } = await render(Scorecard);
+
+		expect(container.querySelector('input[type="tel"]')).toBeNull();
+		await enterScore('P1', '2', '10+4');
+		await expect.element(page.getByRole('dialog', { name: 'Score keypad' })).toBeVisible();
+		await expect.element(score('P1', '2')).toHaveTextContent('14');
+		await expect
+			.element(page.getByRole('button', { name: 'P1, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		await page.getByRole('button', { name: 'P1, round 2' }).click();
+		await expect.element(score('P1', '2')).toHaveTextContent('14');
+
+		await page.getByRole('button', { name: 'P2, round 2' }).click();
+		await enterScore('P2', '2', '-3');
+		await expect.element(score('P1', '2')).toHaveTextContent('14');
+		await expect.element(score('P2', '2')).toHaveTextContent('-3');
+
+		await page.getByRole('button', { name: 'Next row' }).click();
+		await expect
+			.element(page.getByRole('button', { name: 'P2, round 3' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		await page.getByRole('button', { name: 'Close keypad' }).click();
+		expect(document.querySelector('[role="dialog"]')).toBeNull();
+	});
+
+	it('replaces a score from the keyboard, then moves and closes', async () => {
+		await render(Scorecard);
+		await enterScore('P1', '2', '12');
+		await score('P1', '2').click();
+		keydown('4');
+		await expect.element(score('P1', '2')).toHaveTextContent('4');
+
+		keydown('ArrowRight');
+		await expect
+			.element(page.getByRole('button', { name: 'P2, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		keydown('ArrowLeft');
+		await expect
+			.element(page.getByRole('button', { name: 'P1, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		keydown('ArrowLeft');
+		await expect
+			.element(page.getByRole('button', { name: 'P1, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
+		keydown('a');
+
+		for (const round of ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']) {
+			keydown('ArrowDown');
+			await expect
+				.element(page.getByRole('button', { name: `P1, round ${round}` }))
+				.toHaveAttribute('aria-pressed', 'true');
+		}
+		keydown('ArrowDown');
+		await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+	});
+
+	it('drops an unfinished minus and closes when a name is edited', async () => {
+		await render(Scorecard);
+		await score('P1', '2').click();
+		await page.getByRole('button', { name: 'Subtract', exact: true }).click();
+		await page.getByLabelText('Player 1 name').click();
+
+		await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+		await expect
+			.poll(() => document.querySelector('[aria-label="P1 score, round 2"]')?.textContent)
+			.toBe('');
+	});
+
+	it('clears the expression and keeps the last player in view', async () => {
+		await render(Scorecard);
+		const add = page.getByRole('button', { name: 'Add player' });
+		for (let i = 0; i < 8; i++) await add.click();
+
+		await enterScore('P10', '2', '8<');
+		await expect
+			.poll(() => document.querySelector('[aria-label="P10 score, round 2"]')?.textContent)
+			.toBe('');
+		await expect
+			.element(page.getByRole('button', { name: 'P10, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
+
+		keydown('ArrowRight');
+		await expect
+			.element(page.getByRole('button', { name: 'P10, round 2' }))
+			.toHaveAttribute('aria-pressed', 'true');
 	});
 });
